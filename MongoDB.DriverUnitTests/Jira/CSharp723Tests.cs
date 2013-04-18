@@ -66,10 +66,29 @@ namespace MongoDB.DriverUnitTests.Jira
         }
 
         [Test]
+        public void TestRetrieveInterfaceWithNoFilter()
+        {
+            var result = _interfaceCollection.AsQueryable<IJob>().FirstOrDefault();
+            Assert.IsNotNull(result);
+            Assert.AreEqual(_id1, result.Id);
+            Assert.AreEqual(false, result.IsFaulted);
+        }
+
+        [Test]
         [ExpectedException(typeof(NotSupportedException))]
-        public void TestRetrieveInterface()
+        public void TestRetrieveInterfaceWithEnumFilter()
         {
             var result = _interfaceCollection.AsQueryable<IJob>().FirstOrDefault(x => x.Status == JobStatus.Created);
+            Assert.IsNotNull(result);
+            Assert.AreEqual(_id1, result.Id);
+            Assert.AreEqual(false, result.IsFaulted);
+        }
+
+        [Test]
+        [ExpectedException(typeof(NotSupportedException))]
+        public void TestRetrieveInterfaceWithPrimitiveFilter()
+        {
+            var result = _interfaceCollection.AsQueryable<IJob>().FirstOrDefault(x => x.IsFaulted == false);
             Assert.IsNotNull(result);
             Assert.AreEqual(_id1, result.Id);
             Assert.AreEqual(false, result.IsFaulted);
