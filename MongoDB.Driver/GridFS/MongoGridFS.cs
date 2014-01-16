@@ -312,7 +312,15 @@ namespace MongoDB.Driver.GridFS
         /// <param name="query">A query that specifies the GridFS files to delete.</param>
         public void Delete(IMongoQuery query)
         {
-            foreach (var fileInfo in Find(query, ReadPreference.Primary))
+            if (_settings.ReadPreference != ReadPreference.Primary)
+            {
+                var settings = _settings.Clone();
+                settings.ReadPreference = ReadPreference.Primary;
+                var gridFS = new MongoGridFS(_server, _databaseName, settings);
+                gridFS.Delete(query);
+                return;
+            }
+            foreach (var fileInfo in Find(query))
             {
                 fileInfo.Delete();
             }
@@ -324,6 +332,14 @@ namespace MongoDB.Driver.GridFS
         /// <param name="remoteFileName">The remote file name.</param>
         public void Delete(string remoteFileName)
         {
+            if (_settings.ReadPreference != ReadPreference.Primary)
+            {
+                var settings = _settings.Clone();
+                settings.ReadPreference = ReadPreference.Primary;
+                var gridFS = new MongoGridFS(_server, _databaseName, settings);
+                gridFS.Delete(remoteFileName);
+                return;
+            }
             using (_server.RequestStart(null, ReadPreference.Primary))
             {
                 EnsureIndexes();
@@ -337,6 +353,14 @@ namespace MongoDB.Driver.GridFS
         /// <param name="id">The GridFS file Id.</param>
         public void DeleteById(BsonValue id)
         {
+            if (_settings.ReadPreference != ReadPreference.Primary)
+            {
+                var settings = _settings.Clone();
+                settings.ReadPreference = ReadPreference.Primary;
+                var gridFS = new MongoGridFS(_server, _databaseName, settings);
+                gridFS.DeleteById(id);
+                return;
+            }
             Delete(Query.EQ("_id", id));
         }
 
@@ -601,7 +625,20 @@ namespace MongoDB.Driver.GridFS
         /// <returns>The matching GridFS files.</returns>
         public MongoCursor<MongoGridFSFileInfo> Find(IMongoQuery query)
         {
-            return Find(query, _settings.ReadPreference);
+            using (_server.RequestStart(null, _settings.ReadPreference))
+            {
+                var serverInstance = _server.RequestConnection.ServerInstance;
+                var database = GetDatabase();
+                var filesCollection = GetFilesCollection(database);
+                var serializationOptions = new MongoGridFSFileInfo.SerializationOptions
+                {
+                    Server = _server,
+                    ServerInstance = serverInstance,
+                    DatabaseName = _databaseName,
+                    GridFSSettings = _settings
+                };
+                return filesCollection.FindAs<MongoGridFSFileInfo>(query).SetSerializationOptions(serializationOptions);
+            }
         }
 
         /// <summary>
@@ -1094,24 +1131,6 @@ namespace MongoDB.Driver.GridFS
             }
 
             return _settings.ReadPreference;
-        }
-
-        private MongoCursor<MongoGridFSFileInfo> Find(IMongoQuery query, ReadPreference readPreference)
-        {
-            using (_server.RequestStart(null, readPreference))
-            {
-                var serverInstance = _server.RequestConnection.ServerInstance;
-                var database = GetDatabase(readPreference);
-                var filesCollection = GetFilesCollection(database);
-                var serializationOptions = new MongoGridFSFileInfo.SerializationOptions
-                {
-                    Server = _server,
-                    ServerInstance = serverInstance,
-                    DatabaseName = _databaseName,
-                    GridFSSettings = _settings
-                };
-                return filesCollection.FindAs<MongoGridFSFileInfo>(query).SetSerializationOptions(serializationOptions);
-            }
         }
     }
 }
